@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
 import { FORMAT_LABEL, GENRE_LABEL, type Media, type RankSort } from '../lib/anilist';
-import { useZh } from '../lib/zh';
-import { useZhInfo } from '../lib/zhTitle';
+import { useZhInfo, useZhName } from '../lib/zhTitle';
 
 export function useDisplayTitle(media: Media | undefined) {
-  const { t } = useZh();
   const info = useZhInfo(media);
+  const zh = useZhName(info);
   const native = media?.title.native ?? media?.title.romaji ?? '';
-  return { title: info?.cn ? t(info.cn) : native, native, info };
+  return { title: zh ?? native, native, info };
 }
 
 export function formatCount(n: number): string {

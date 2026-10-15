@@ -5,6 +5,12 @@ export type ZhMode = 'tw' | 'cn';
 
 const toTw = OpenCC.Converter({ from: 'cn', to: 'twp' });
 const toCn = OpenCC.Converter({ from: 'tw', to: 'cn' });
+const cnToTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
+
+/** 全是繁體字才算繁體；繁簡混用的字串當作簡體，顯示時再整句轉換 */
+export function isTraditional(s: string): boolean {
+  return cnToTw(s) === s && toCn(s) !== s;
+}
 
 const STORAGE_KEY = 'zh-mode';
 

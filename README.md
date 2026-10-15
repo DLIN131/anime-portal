@@ -6,6 +6,7 @@
 
 - [AniList](https://anilist.co) GraphQL API：排行（收藏人數、評分、熱度、最愛數）、作品資訊、官方 PV
 - [bangumi-data](https://github.com/bangumi-data/bangumi-data)：動畫的繁中譯名
+- [Wikidata](https://www.wikidata.org)：以 AniList ID 對應的台灣 / 大陸正式譯名
 - [Bangumi 番組計劃](https://bgm.tv) API：中文名稱與中文簡介
 
 皆為免費開放 API，不需要金鑰。
