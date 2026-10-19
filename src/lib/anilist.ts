@@ -1,10 +1,16 @@
 // 開放 API：AniList GraphQL (https://docs.anilist.co)
-// 人氣排行：依日本作品 (countryOfOrigin: JP) 的開播 / 連載開始日期篩選
+// 人氣排行：依日本 (countryOfOrigin: JP) 或韓國 (KR) 作品的開播 / 連載開始日期篩選
 import { periodRange, type Period } from './season';
 
 const API = 'https://graphql.anilist.co';
 
 export type MediaType = 'ANIME' | 'MANGA';
+export type Country = 'JP' | 'KR';
+
+/** 排行頁的網址前綴：動畫、日本漫畫、韓漫 */
+export function sectionPath(type: MediaType, country: Country = 'JP') {
+  return type === 'ANIME' ? '/anime' : country === 'KR' ? '/manhwa' : '/manga';
+}
 export type RankSort = 'POPULARITY_DESC' | 'SCORE_DESC' | 'TRENDING_DESC' | 'FAVOURITES_DESC';
 
 export interface Trailer {
@@ -103,10 +109,10 @@ const RANKING_FILTER: Record<RankBy, string> = {
 };
 
 const rankingQuery = (by: RankBy) => `
-query ($type: MediaType, $from: FuzzyDateInt, $to: FuzzyDateInt, $sort: [MediaSort], $formats: [MediaFormat], $page: Int, $perPage: Int) {
+query ($type: MediaType, $country: CountryCode, $from: FuzzyDateInt, $to: FuzzyDateInt, $sort: [MediaSort], $formats: [MediaFormat], $page: Int, $perPage: Int) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage total }
-    media(type: $type, countryOfOrigin: JP, isAdult: false, ${RANKING_FILTER[by]},
+    media(type: $type, countryOfOrigin: $country, isAdult: false, ${RANKING_FILTER[by]},
           sort: $sort, format_in: $formats) {
       ${MEDIA_FIELDS}
     }
@@ -117,6 +123,7 @@ export async function fetchRanking(opts: {
   type: MediaType;
   year: number;
   period: Period;
+  country?: Country;
   by?: RankBy;
   sort: RankSort;
   formats: string[];
@@ -126,6 +133,7 @@ export async function fetchRanking(opts: {
   const [from, to] = periodRange(opts.year, opts.period);
   const data = await gql<{ Page: { pageInfo: { hasNextPage: boolean; total: number }; media: Media[] } }>(rankingQuery(opts.by ?? 'start'), {
     type: opts.type,
+    country: opts.country ?? 'JP',
     // FuzzyDateInt 為 YYYYMMDD，greater / lesser 皆不含端點
     from: Number(from.replace(/-/g, '')) - 1,
     to: Number(to.replace(/-/g, '')),

@@ -1,17 +1,17 @@
 import { Link } from 'react-router-dom';
 import { RankRow } from '../components/RankCard';
 import { ErrorBox, Loading } from '../components/Status';
-import { fetchRanking, type MediaType } from '../lib/anilist';
+import { fetchRanking, sectionPath, type Country, type MediaType } from '../lib/anilist';
 import { currentSeason, PERIOD_LABEL, type Period } from '../lib/season';
 import { useAsync } from '../lib/useAsync';
 
-function TopList({ type, year, period, title }: { type: MediaType; year: number; period: Period; title: string }) {
+function TopList({ type, country, year, period, title }: { type: MediaType; country?: Country; year: number; period: Period; title: string }) {
   const formats = type === 'ANIME' ? ['TV', 'TV_SHORT', 'MOVIE', 'ONA', 'OVA'] : ['MANGA'];
   const { data, error, loading } = useAsync(
-    () => fetchRanking({ type, year, period, sort: 'POPULARITY_DESC', formats, page: 1, perPage: 10 }),
-    [type, year, period],
+    () => fetchRanking({ type, country, year, period, sort: 'POPULARITY_DESC', formats, page: 1, perPage: 10 }),
+    [type, country, year, period],
   );
-  const base = type === 'ANIME' ? '/anime' : '/manga';
+  const base = sectionPath(type, country);
   return (
     <section className="panel top-list">
       <div className="top-list-head">
@@ -35,13 +35,15 @@ export default function HomePage() {
   return (
     <>
       <div className="page-head">
-        <h1>日本動畫・漫畫人氣排行</h1>
+        <h1>日本動畫・漫畫、韓漫人氣排行</h1>
       </div>
       <div className="home-grid">
         <TopList type="ANIME" year={now.year} period={now.season} title={`${now.year} 年${PERIOD_LABEL[now.season]}・動畫 TOP 10`} />
         <TopList type="ANIME" year={now.year} period="year" title={`${now.year} 年度・動畫 TOP 10`} />
         <TopList type="MANGA" year={now.year} period="year" title={`${now.year} 年新連載・漫畫 TOP 10`} />
         <TopList type="MANGA" year={now.year - 1} period="year" title={`${now.year - 1} 年新連載・漫畫 TOP 10`} />
+        <TopList type="MANGA" country="KR" year={now.year} period="year" title={`${now.year} 年新連載・韓漫 TOP 10`} />
+        <TopList type="MANGA" country="KR" year={now.year - 1} period="year" title={`${now.year - 1} 年新連載・韓漫 TOP 10`} />
       </div>
     </>
   );

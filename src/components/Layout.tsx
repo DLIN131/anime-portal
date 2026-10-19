@@ -15,6 +15,7 @@ export default function Layout() {
             <NavLink to="/" end>{mode === 'tw' ? '總覽' : '总览'}</NavLink>
             <NavLink to="/anime">{mode === 'tw' ? '動畫排行' : '动画排行'}</NavLink>
             <NavLink to="/manga">{mode === 'tw' ? '漫畫排行' : '漫画排行'}</NavLink>
+            <NavLink to="/manhwa">{mode === 'tw' ? '韓漫排行' : '韩漫排行'}</NavLink>
           </nav>
           <div className="zh-toggle" role="group" aria-label="字形">
             <button className={mode === 'tw' ? 'on' : ''} onClick={() => setMode('tw')}>
@@ -35,7 +36,7 @@ export default function Layout() {
           <a href="https://anilist.co" target="_blank" rel="noreferrer">
             AniList
           </a>
-          開放 API（日本作品，依收藏人數 / 評分排序）；中文名稱與簡介：
+          開放 API（日本、韓國作品，依收藏人數 / 評分排序）；中文名稱與簡介：
           <a href="https://github.com/bangumi-data/bangumi-data" target="_blank" rel="noreferrer">
             bangumi-data
           </a>
