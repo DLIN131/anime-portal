@@ -298,6 +298,7 @@ export function useZhInfo(media: MediaRef | undefined): ZhInfo | undefined {
 export function useZhName(info: ZhInfo | undefined): string | null {
   const { mode, t } = useZh();
   if (!info) return null;
-  if (mode === 'tw') return info.tw ?? (info.cn ? t(info.cn) : null);
-  return info.cn ?? (info.tw ? t(info.tw) : null);
+  // 資料來源偶有把簡體標成繁體（或反過來），不是純繁體的名稱一律再轉換
+  if (mode === 'tw') return info.tw && isTraditional(info.tw) ? info.tw : t(info.tw ?? info.cn) || null;
+  return t(info.cn ?? info.tw) || null;
 }

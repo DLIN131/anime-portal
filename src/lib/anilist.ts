@@ -74,7 +74,8 @@ const MEDIA_FIELDS = `
 
 const memo = new Map<string, Promise<unknown>>();
 
-async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+/** accept 回傳 false 時視為失敗（不快取），例如 AniList 逾時回傳的空清單 */
+async function gql<T>(query: string, variables: Record<string, unknown>, accept?: (data: T) => boolean): Promise<T> {
   const key = query + JSON.stringify(variables);
   let p = memo.get(key) as Promise<T> | undefined;
   if (!p) {
@@ -86,6 +87,7 @@ async function gql<T>(query: string, variables: Record<string, unknown>): Promis
       if (r.status === 429) throw new Error('AniList 請求太頻繁，請稍等一分鐘後再試');
       const j = await r.json();
       if (!r.ok || j.errors) throw new Error(`AniList API 錯誤：${j.errors?.[0]?.message ?? r.status}`);
+      if (accept && !accept(j.data)) throw new Error('AniList 查詢逾時，請重新整理再試一次');
       return j.data as T;
     });
     memo.set(key, p);
@@ -103,26 +105,39 @@ export interface RankingPage {
 /** start：依開播 / 開始連載日期；end：依完結日期（只取已完結作品） */
 export type RankBy = 'start' | 'end';
 
-const RANKING_FILTER: Record<RankBy, string> = {
-  start: 'startDate_greater: $from, startDate_lesser: $to',
-  end: 'status: FINISHED, endDate_greater: $from, endDate_lesser: $to',
-};
+/**
+ * 歷年總排行只取收藏超過此人數的作品：不限日期時 AniList 要掃過整個資料庫，
+ * 經常逾時並直接回傳空清單，加上門檻後多半 1 秒內就能回應
+ */
+export const ALL_TIME_MIN_POPULARITY = 3000;
 
-const rankingQuery = (by: RankBy) => `
-query ($type: MediaType, $country: CountryCode, $from: FuzzyDateInt, $to: FuzzyDateInt, $sort: [MediaSort], $formats: [MediaFormat], $page: Int, $perPage: Int) {
+/** ranged 為 false 時不限日期（歷年總排行） */
+function rankingQuery(by: RankBy, ranged: boolean) {
+  const date = by === 'end' ? 'endDate' : 'startDate';
+  const filters = [
+    by === 'end' ? 'status: FINISHED' : '',
+    ranged ? `${date}_greater: $from, ${date}_lesser: $to` : `popularity_greater: ${ALL_TIME_MIN_POPULARITY}`,
+  ]
+    .filter(Boolean)
+    .map((f) => `${f}, `)
+    .join('');
+  return `
+query ($type: MediaType, $country: CountryCode, ${ranged ? '$from: FuzzyDateInt, $to: FuzzyDateInt, ' : ''}$sort: [MediaSort], $formats: [MediaFormat], $page: Int, $perPage: Int) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage total }
-    media(type: $type, countryOfOrigin: $country, isAdult: false, ${RANKING_FILTER[by]},
+    media(type: $type, countryOfOrigin: $country, isAdult: false, ${filters}
           sort: $sort, format_in: $formats) {
       ${MEDIA_FIELDS}
     }
   }
 }`;
+}
 
 export async function fetchRanking(opts: {
   type: MediaType;
-  year: number;
-  period: Period;
+  /** 不指定年份即為歷年總排行 */
+  year?: number;
+  period?: Period;
   country?: Country;
   by?: RankBy;
   sort: RankSort;
@@ -130,18 +145,21 @@ export async function fetchRanking(opts: {
   page: number;
   perPage?: number;
 }): Promise<RankingPage> {
-  const [from, to] = periodRange(opts.year, opts.period);
-  const data = await gql<{ Page: { pageInfo: { hasNextPage: boolean; total: number }; media: Media[] } }>(rankingQuery(opts.by ?? 'start'), {
+  type Result = { Page: { pageInfo: { hasNextPage: boolean; total: number }; media: Media[] } };
+  const range = opts.year ? periodRange(opts.year, opts.period ?? 'year') : null;
+  // 總排行第一頁不可能是空的，空清單代表 AniList 逾時，自動重試一次
+  const accept = range || opts.page > 1 ? undefined : (d: Result) => d.Page.media.length > 0;
+  const run = () => gql<Result>(rankingQuery(opts.by ?? 'start', !!range), {
     type: opts.type,
     country: opts.country ?? 'JP',
     // FuzzyDateInt 為 YYYYMMDD，greater / lesser 皆不含端點
-    from: Number(from.replace(/-/g, '')) - 1,
-    to: Number(to.replace(/-/g, '')),
+    ...(range && { from: Number(range[0].replace(/-/g, '')) - 1, to: Number(range[1].replace(/-/g, '')) }),
     sort: [opts.sort, 'ID'],
     formats: opts.formats,
     page: opts.page,
     perPage: opts.perPage ?? 50,
-  });
+  }, accept);
+  const data = await run().catch(() => run());
   return { items: data.Page.media, hasNextPage: data.Page.pageInfo.hasNextPage, total: data.Page.pageInfo.total };
 }
 

@@ -3,7 +3,7 @@ import { Navigate, NavLink, useParams } from 'react-router-dom';
 import RankCard from '../components/RankCard';
 import SeasonPicker from '../components/SeasonPicker';
 import { ErrorBox, Loading } from '../components/Status';
-import { ANIME_FORMATS, fetchRanking, MANGA_FORMATS, sectionPath, type Media, type Country, type MediaType, type RankBy, type RankSort } from '../lib/anilist';
+import { ALL_TIME_MIN_POPULARITY, ANIME_FORMATS, fetchRanking, MANGA_FORMATS, sectionPath, type Media, type Country, type MediaType, type RankBy, type RankSort } from '../lib/anilist';
 import { currentSeason, isPeriod, PERIOD_LABEL } from '../lib/season';
 
 const SORT_LABEL: Record<RankSort, string> = {
@@ -13,10 +13,19 @@ const SORT_LABEL: Record<RankSort, string> = {
   FAVOURITES_DESC: '最愛數',
 };
 
-export default function RankingPage({ type, country = 'JP', by = 'start' }: { type: MediaType; country?: Country; by?: RankBy }) {
+interface Props {
+  type: MediaType;
+  country?: Country;
+  by?: RankBy;
+  /** 歷年總排行：不分年份 */
+  allTime?: boolean;
+}
+
+export default function RankingPage({ type, country = 'JP', by = 'start', allTime = false }: Props) {
   const params = useParams();
-  const year = Number(params.year);
-  const period = params.period;
+  // 總排行沒有年份參數，年份選單預設停在今年
+  const year = allTime ? currentSeason().year : Number(params.year);
+  const period = allTime ? 'year' : params.period;
   const typePath = sectionPath(type, country);
   const basePath = by === 'end' ? `${typePath}/finished` : typePath;
   const formatLabels = type === 'ANIME' ? ANIME_FORMATS : MANGA_FORMATS;
@@ -32,13 +41,14 @@ export default function RankingPage({ type, country = 'JP', by = 'start' }: { ty
   const [error, setError] = useState<Error>();
 
   const valid = isPeriod(period) && !!year;
+  const suffix = allTime ? 'all' : `${year}/${period}`;
 
   const load = async (p: number) => {
     if (!valid) return;
     setLoading(true);
     setError(undefined);
     try {
-      const res = await fetchRanking({ type, year, period, country, by, sort, formats, page: p });
+      const res = await fetchRanking({ type, year: allTime ? undefined : year, period, country, by, sort, formats, page: p });
       setItems((prev) => (p === 1 ? res.items : prev.concat(res.items)));
       setHasNext(res.hasNextPage);
       setTotal(res.total);
@@ -59,7 +69,7 @@ export default function RankingPage({ type, country = 'JP', by = 'start' }: { ty
     setItems([]);
     void load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, year, period, sort, formats.join()]);
+  }, [type, year, period, allTime, sort, formats.join()]);
 
   if (!valid) {
     const c = currentSeason();
@@ -76,17 +86,19 @@ export default function RankingPage({ type, country = 'JP', by = 'start' }: { ty
     <section>
       {type === 'MANGA' && (
         <nav className="list-tabs" aria-label={country === 'KR' ? '韓漫分類' : '漫畫分類'}>
-          <NavLink to={`${typePath}/${year}/${period}`}>新連載</NavLink>
-          <NavLink to={`${typePath}/finished/${year}/${period}`}>已完結</NavLink>
+          <NavLink to={`${typePath}/${suffix}`}>{allTime ? '全部' : '新連載'}</NavLink>
+          <NavLink to={`${typePath}/finished/${suffix}`}>已完結</NavLink>
         </nav>
       )}
       <div className="page-head">
         <h1>
-          {year} 年 {PERIOD_LABEL[period]} {by === 'end' ? '完結的' : ''}
+          {allTime ? '歷年' : `${year} 年 ${PERIOD_LABEL[period]} `}
+          {by === 'end' ? '完結的' : ''}
           {country === 'KR' ? '韓國' : '日本'}
-          {type === 'ANIME' ? '動畫' : '漫畫'}排行
+          {type === 'ANIME' ? '動畫' : '漫畫'}
+          {allTime ? '總排行' : '排行'}
         </h1>
-        <SeasonPicker basePath={basePath} year={year} period={period} minYear={1970} maxYear={currentSeason().year + (type === 'ANIME' ? 1 : 0)} />
+        <SeasonPicker basePath={basePath} year={year} period={period} allTime={allTime} minYear={1970} maxYear={currentSeason().year + (type === 'ANIME' ? 1 : 0)} />
       </div>
 
       <div className="toolbar">
@@ -106,9 +118,11 @@ export default function RankingPage({ type, country = 'JP', by = 'start' }: { ty
         </div>
       </div>
       <p className="count">
-        {by === 'end' ? '以完結日期' : type === 'ANIME' ? '以開播日期' : '以開始連載日期'}歸類
+        {allTime
+          ? `不分年份${by === 'end' ? '、只列出已完結' : ''}，收藏超過 ${ALL_TIME_MIN_POPULARITY.toLocaleString('zh-TW')} 人的作品`
+          : `${by === 'end' ? '以完結日期' : type === 'ANIME' ? '以開播日期' : '以開始連載日期'}歸類`}
         {/* AniList 的總數最多只回傳 5000，達到上限時不顯示 */}
-        {total < 5000 && `，共 ${total.toLocaleString('zh-TW')} 部`} · 人氣為 AniList 收藏人數
+        {total > 0 && total < 5000 && `，共 ${total.toLocaleString('zh-TW')} 部`} · 人氣為 AniList 收藏人數
       </p>
 
       {error && <ErrorBox error={error} />}
