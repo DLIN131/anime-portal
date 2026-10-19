@@ -21,6 +21,8 @@ const router = createHashRouter([
       { path: 'anime/:year/:period', element: <RankingPage key="anime" type="ANIME" /> },
       { path: 'manga', element: <Navigate to={`/manga/${now.year}/year`} replace /> },
       { path: 'manga/item/:id', element: <DetailPage type="MANGA" /> },
+      { path: 'manga/finished', element: <Navigate to={`/manga/finished/${now.year}/year`} replace /> },
+      { path: 'manga/finished/:year/:period', element: <RankingPage key="manga-finished" type="MANGA" by="end" /> },
       { path: 'manga/:year/:period', element: <RankingPage key="manga" type="MANGA" /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

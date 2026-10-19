@@ -26,7 +26,14 @@ export function metricOf(m: Media, sort: RankSort): string {
   }
 }
 
-export default function RankCard({ media, rank, sort }: { media: Media; rank: number; sort: RankSort }) {
+/** 連載期間與卷數，例如「2009–2021・全 34 卷」 */
+function runOf(m: Media): string {
+  const { startDate: s, endDate: e } = m;
+  const years = s.year && e.year ? (s.year === e.year ? `${s.year}` : `${s.year}–${e.year}`) : '';
+  return [years, m.volumes ? `全 ${m.volumes} 卷` : ''].filter(Boolean).join('・');
+}
+
+export default function RankCard({ media, rank, sort, showRun }: { media: Media; rank: number; sort: RankSort; showRun?: boolean }) {
   const { title, native } = useDisplayTitle(media);
   const path = media.type === 'ANIME' ? 'anime' : 'manga';
   return (
@@ -43,6 +50,7 @@ export default function RankCard({ media, rank, sort }: { media: Media; rank: nu
             {native}
           </p>
         )}
+        {showRun && runOf(media) && <p className="run">{runOf(media)}</p>}
         <div className="card-foot">
           <span className="metric">{metricOf(media, sort)}</span>
           {media.averageScore && sort !== 'SCORE_DESC' ? <span className="score-mini">★ {media.averageScore}</span> : null}

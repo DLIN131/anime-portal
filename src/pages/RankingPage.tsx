@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, useParams } from 'react-router-dom';
 import RankCard from '../components/RankCard';
 import SeasonPicker from '../components/SeasonPicker';
 import { ErrorBox, Loading } from '../components/Status';
-import { ANIME_FORMATS, fetchRanking, MANGA_FORMATS, type Media, type MediaType, type RankSort } from '../lib/anilist';
+import { ANIME_FORMATS, fetchRanking, MANGA_FORMATS, type Media, type MediaType, type RankBy, type RankSort } from '../lib/anilist';
 import { currentSeason, isPeriod, PERIOD_LABEL } from '../lib/season';
 
 const SORT_LABEL: Record<RankSort, string> = {
@@ -13,11 +13,12 @@ const SORT_LABEL: Record<RankSort, string> = {
   FAVOURITES_DESC: '最愛數',
 };
 
-export default function RankingPage({ type }: { type: MediaType }) {
+export default function RankingPage({ type, by = 'start' }: { type: MediaType; by?: RankBy }) {
   const params = useParams();
   const year = Number(params.year);
   const period = params.period;
-  const basePath = type === 'ANIME' ? '/anime' : '/manga';
+  const typePath = type === 'ANIME' ? '/anime' : '/manga';
+  const basePath = by === 'end' ? `${typePath}/finished` : typePath;
   const formatLabels = type === 'ANIME' ? ANIME_FORMATS : MANGA_FORMATS;
   const defaultFormats = type === 'ANIME' ? ['TV', 'TV_SHORT', 'MOVIE', 'ONA', 'OVA'] : ['MANGA'];
 
@@ -37,7 +38,7 @@ export default function RankingPage({ type }: { type: MediaType }) {
     setLoading(true);
     setError(undefined);
     try {
-      const res = await fetchRanking({ type, year, period, sort, formats, page: p });
+      const res = await fetchRanking({ type, year, period, by, sort, formats, page: p });
       setItems((prev) => (p === 1 ? res.items : prev.concat(res.items)));
       setHasNext(res.hasNextPage);
       setTotal(res.total);
@@ -73,9 +74,15 @@ export default function RankingPage({ type }: { type: MediaType }) {
 
   return (
     <section>
+      {type === 'MANGA' && (
+        <nav className="list-tabs" aria-label="漫畫分類">
+          <NavLink to={`${typePath}/${year}/${period}`}>新連載</NavLink>
+          <NavLink to={`${typePath}/finished/${year}/${period}`}>已完結</NavLink>
+        </nav>
+      )}
       <div className="page-head">
         <h1>
-          {year} 年 {PERIOD_LABEL[period]} 日本{type === 'ANIME' ? '動畫' : '漫畫'}排行
+          {year} 年 {PERIOD_LABEL[period]} {by === 'end' ? '完結的' : ''}日本{type === 'ANIME' ? '動畫' : '漫畫'}排行
         </h1>
         <SeasonPicker basePath={basePath} year={year} period={period} minYear={1970} maxYear={currentSeason().year + (type === 'ANIME' ? 1 : 0)} />
       </div>
@@ -97,7 +104,9 @@ export default function RankingPage({ type }: { type: MediaType }) {
         </div>
       </div>
       <p className="count">
-        {type === 'ANIME' ? '以開播日期' : '以開始連載日期'}歸類，共 {total.toLocaleString('zh-TW')} 部 · 人氣為 AniList 收藏人數
+        {by === 'end' ? '以完結日期' : type === 'ANIME' ? '以開播日期' : '以開始連載日期'}歸類
+        {/* AniList 的總數最多只回傳 5000，達到上限時不顯示 */}
+        {total < 5000 && `，共 ${total.toLocaleString('zh-TW')} 部`} · 人氣為 AniList 收藏人數
       </p>
 
       {error && <ErrorBox error={error} />}
@@ -107,7 +116,7 @@ export default function RankingPage({ type }: { type: MediaType }) {
       {items.length > 0 && (
         <div className="grid">
           {items.map((m, i) => (
-            <RankCard key={m.id} media={m} rank={i + 1} sort={sort} />
+            <RankCard key={m.id} media={m} rank={i + 1} sort={sort} showRun={by === 'end'} />
           ))}
         </div>
       )}

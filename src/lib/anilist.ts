@@ -94,11 +94,19 @@ export interface RankingPage {
   total: number;
 }
 
-const RANKING_QUERY = `
+/** start：依開播 / 開始連載日期；end：依完結日期（只取已完結作品） */
+export type RankBy = 'start' | 'end';
+
+const RANKING_FILTER: Record<RankBy, string> = {
+  start: 'startDate_greater: $from, startDate_lesser: $to',
+  end: 'status: FINISHED, endDate_greater: $from, endDate_lesser: $to',
+};
+
+const rankingQuery = (by: RankBy) => `
 query ($type: MediaType, $from: FuzzyDateInt, $to: FuzzyDateInt, $sort: [MediaSort], $formats: [MediaFormat], $page: Int, $perPage: Int) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage total }
-    media(type: $type, countryOfOrigin: JP, isAdult: false, startDate_greater: $from, startDate_lesser: $to,
+    media(type: $type, countryOfOrigin: JP, isAdult: false, ${RANKING_FILTER[by]},
           sort: $sort, format_in: $formats) {
       ${MEDIA_FIELDS}
     }
@@ -109,13 +117,14 @@ export async function fetchRanking(opts: {
   type: MediaType;
   year: number;
   period: Period;
+  by?: RankBy;
   sort: RankSort;
   formats: string[];
   page: number;
   perPage?: number;
 }): Promise<RankingPage> {
   const [from, to] = periodRange(opts.year, opts.period);
-  const data = await gql<{ Page: { pageInfo: { hasNextPage: boolean; total: number }; media: Media[] } }>(RANKING_QUERY, {
+  const data = await gql<{ Page: { pageInfo: { hasNextPage: boolean; total: number }; media: Media[] } }>(rankingQuery(opts.by ?? 'start'), {
     type: opts.type,
     // FuzzyDateInt 為 YYYYMMDD，greater / lesser 皆不含端點
     from: Number(from.replace(/-/g, '')) - 1,
